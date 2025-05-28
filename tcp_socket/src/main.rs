@@ -9,17 +9,30 @@
 * understand of the Rust language.
 */
 use std::io;
+use std::collections::HashMap;
+use std::net::Ipv4Addr;
+
+mod tcp;
+
+#![derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+struct Quad {
+    src: (Ipv4Addr, u16),
+    dst: (Ipv4Addr, u16),
+}
+
 
 fn main() -> io::Result<()> {
+    let mut connections: HashMap<Quad, tcp::State> = Default::default();
+
     // Create a new tun with the name "tun0"
     let nic = tun_tap::Iface::new("tun0", tun_tap::Mode::Tun).expect("Failed to create tunnel");
     let mut buf = [0u8; 1504];
     loop {
         let nbytes = nic.recv(&mut buf[..])?;
-        let flags = u16::from_be_bytes([buf[0], buf[1]]);
+        let _flags = u16::from_be_bytes([buf[0], buf[1]]);
         let proto = u16::from_be_bytes([buf[2], buf[3]]);
 
-        /**
+        /*
          * Ignore any packet that is not IPv4
          */
         if proto != 0x800 {
@@ -28,30 +41,40 @@ fn main() -> io::Result<()> {
 
         match etherparse::Ipv4HeaderSlice::from_slice(&buf[4..nbytes]) {
             Ok(packet) => {
-                /**
-                eprintln!(
-                    "read {} bytes: (flags: {:x}, proto: {:x})): {:x?}",
-                    nbytes - 4,
-                    flags,
-                    proto,
-                    packet,
-                );
-                */
                 let src = packet.source_addr();
                 let dest = packet.destination_addr();
                 let protocol = packet.protocol();
-                eprintln!(
-                    "Got {} bytes of IPv4 payload from {} to {} using the {:?} protocol",
-                    packet.total_len(),
-                    src,
-                    dest,
-                    protocol
-                );
+
+                /*
+                 * Not TCP
+                 */
+                if protocol != etherparse::IpNumber(0x06) {
+                    continue;
+                }
+
+                match etherparse::TcpHeaderSlice::from_slice(&buf[4 + packet.slice().len()..]) {
+                    Ok(packet) => {
+                        connections.entry(Quad {
+                            src: (src, packet.source_port()),
+                            dst: (dest, packet.destination_port()),
+                        }).or_default();
+
+                        eprintln!(
+                            "{} -> {} {}b of TCP Packet to port {}",
+                            src,
+                            dest,
+                            packet.slice().len(),
+                            packet.destination_port(),
+                        );
+                    }
+                    Err(err) => {
+                        eprintln!("Ignoring incorrect format packet {:?}", err);
+                    }
+                }
             }
             Err(err) => {
                 eprintln!("Ignoring incorrect format packet {:?}", err);
             }
         }
     }
-    Ok(())
 }

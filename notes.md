@@ -21,3 +21,7 @@ The TUN/TAP creates a virtual network interface that is treated as a NIC that is
 The IPv4 is the link level protocol, the protocol used to send the packet should be something like TCP (the IP level protocol)
 
 
+Parsing the TCP packet is simply reading bytes from the header according the specified format in the RFC.
+
+
+A connection is a quad of source IP, source port, destination IP, and destination port.
