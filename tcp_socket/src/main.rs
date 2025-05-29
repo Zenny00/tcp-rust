@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 /**
 * The goal of this project is to build a basic implementation of
 * the Transmission Control Protocol (TCP) as specified in RFC 793 (https://www.rfc-editor.org/rfc/rfc793)
@@ -9,17 +10,15 @@
 * understand of the Rust language.
 */
 use std::io;
-use std::collections::HashMap;
 use std::net::Ipv4Addr;
 
 mod tcp;
 
-#![derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 struct Quad {
     src: (Ipv4Addr, u16),
     dst: (Ipv4Addr, u16),
 }
-
 
 fn main() -> io::Result<()> {
     let mut connections: HashMap<Quad, tcp::State> = Default::default();
@@ -40,10 +39,10 @@ fn main() -> io::Result<()> {
         }
 
         match etherparse::Ipv4HeaderSlice::from_slice(&buf[4..nbytes]) {
-            Ok(packet) => {
-                let src = packet.source_addr();
-                let dest = packet.destination_addr();
-                let protocol = packet.protocol();
+            Ok(ip_header) => {
+                let src = ip_header.source_addr();
+                let dest = ip_header.destination_addr();
+                let protocol = ip_header.protocol();
 
                 /*
                  * Not TCP
@@ -52,20 +51,18 @@ fn main() -> io::Result<()> {
                     continue;
                 }
 
-                match etherparse::TcpHeaderSlice::from_slice(&buf[4 + packet.slice().len()..]) {
-                    Ok(packet) => {
-                        connections.entry(Quad {
-                            src: (src, packet.source_port()),
-                            dst: (dest, packet.destination_port()),
-                        }).or_default();
-
-                        eprintln!(
-                            "{} -> {} {}b of TCP Packet to port {}",
-                            src,
-                            dest,
-                            packet.slice().len(),
-                            packet.destination_port(),
-                        );
+                match etherparse::TcpHeaderSlice::from_slice(
+                    &buf[4 + ip_header.slice().len()..nbytes],
+                ) {
+                    Ok(tcp_header) => {
+                        let data_index = 4 + ip_header.slice().len() + tcp_header.slice().len();
+                        connections
+                            .entry(Quad {
+                                src: (src, tcp_header.source_port()),
+                                dst: (dest, tcp_header.destination_port()),
+                            })
+                            .or_default()
+                            .on_packet(ip_header, tcp_header, &buf[data_index..nbytes]);
                     }
                     Err(err) => {
                         eprintln!("Ignoring incorrect format packet {:?}", err);

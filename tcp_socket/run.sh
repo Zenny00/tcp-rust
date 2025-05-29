@@ -1,6 +1,10 @@
 #!/bin/bash
 
 cargo build -r
+ext=$?
+if [[ $ext -ne 0 ]]; then
+  exit $ext
+fi
 sudo setcap CAP_NET_ADMIN=eip ./target/release/tcp_socket
 ./target/release/tcp_socket & # Run the process in the background
 pid=$!

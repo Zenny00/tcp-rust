@@ -25,3 +25,6 @@ Parsing the TCP packet is simply reading bytes from the header according the spe
 
 
 A connection is a quad of source IP, source port, destination IP, and destination port.
+
+
+The first packet sent is the SYN packet. This is the first part of the TCP handshake.
