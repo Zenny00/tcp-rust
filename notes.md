@@ -28,3 +28,15 @@ A connection is a quad of source IP, source port, destination IP, and destinatio
 
 
 The first packet sent is the SYN packet. This is the first part of the TCP handshake.
+
+
+When in the closed state no responses should be sent to recieved packets. In the listening state if we recieve a packet, we should always handle that packet (this assumes that every port is listening).
+
+
+If we recieve SYN then we send a SYN and ACK and move to the SYN recieved state. The state will either move to closed or we get an ACK of the SYN sent.
+
+
+The reason we do the three-way handshake is to ensure that the two hosts are actually talking to each other.
+
+
+When opening a connection you should either expect to recieve and ACK or timeout and close.
